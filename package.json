@@ -1,0 +1,28 @@
+{
+    "name": "ctrl4x",
+    "description": "Controllers for express.js",
+    "version": "0.1.0",
+    "author": {
+        "name": "Sergey Tsapenko",
+        "email": "4031651@gmail.com"
+    },
+    "keywords": [
+        "controller",
+        "controllers",
+        "express",
+        "framework",
+        "web",
+        "router",
+        "app",
+        "api"
+    ],
+    "main": "index",
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/4031651/ctrl4x.git"
+    },
+    "readmeFilename": "Readme.md",
+    "dependencies": {
+        "express": "*"
+    }
+}
