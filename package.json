@@ -1,7 +1,7 @@
 {
     "name": "ctrl4x",
     "description": "Controllers for express.js",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "author": {
         "name": "Sergey Tsapenko",
         "email": "4031651@gmail.com"
