@@ -149,7 +149,10 @@ exports.init = function (app, opts) {
         controllers[controller].request = request;
         controllers[controller].response = response;
         controllers[controller].next = next;
+        response.locals.controller = controller;
+        response.locals.action = action;
         if (settings.i18n) {
+            response.locals.language = language;
             controllers[controller].language = language;
         }
         try {
