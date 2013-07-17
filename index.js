@@ -16,6 +16,7 @@ exports.init = function (app, opts) {
             controllerDir: 'controllers',
             defaultController : 'main',
             defaultAction : 'index',
+            useMethod: false,
             suffix: '',
             debug: false,
             inject: {},
@@ -139,6 +140,25 @@ exports.init = function (app, opts) {
         // action
         if (params[0]) {
             action = params.shift();
+        }
+        if (settings.useMethod) {
+            var _action = action;
+            switch (settings.useMethod) {
+                case 'camelCase':
+                    _action = request.method.toLocaleLowerCase() + action[0].toLocaleUpperCase() + action.substr(1);
+                    break;
+                case 'underscored':
+                    _action = request.method.toLocaleLowerCase() + '_' + action;
+                    break;
+                case 'joined':
+                    _action = request.method.toLocaleLowerCase() + action;
+                    break;
+                default:
+                    break;
+            }
+            if (typeof controllers[controller][_action] != 'undefined') {
+                action = _action;
+            }
         }
         if (typeof controllers[controller][action] == 'undefined') {
             // action doesn't exist
