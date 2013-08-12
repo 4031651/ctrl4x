@@ -6,6 +6,32 @@ function endsWith(str, pattern) {
     return d >= 0 && str.indexOf(pattern, d) === d;
 }
 
+function delegate(ctrl, action) {
+    return function (request, response, next) {
+        ctrl.request = request;
+        ctrl.response = response;
+        ctrl.next = next;
+        if (settings.i18n) {
+            var params = request.url.replace(/^\//, '').replace(/\/$/, ''),
+                language = params === settings.defaultLanguage ? [] : params.split('/')[0];
+
+            if (settings.languages.indexOf(language) == -1) {
+                language = settings.defaultLanguage;
+            }
+
+            ctrl.language = language;
+        }
+        try {
+            ctrl[action].apply(ctrl);
+        } catch (e) {
+            if (settings.debug) {
+                console.log(e.stack.toString());
+                response.end(e.stack.toString());
+            }
+        }
+    };
+}
+
 exports.init = function (app, opts) {
     opts = opts || {};
 
@@ -43,7 +69,7 @@ exports.init = function (app, opts) {
      *      suffix:     {Boolean}          - Use suffix or not. Default is true
      *      params:     {String} | {Array} - Additional params
      */
-    exports.getURL = function(options) {
+    var getURL = exports.getURL = function (options) {
         options = options || {};
 
         options.base = options.base || '';
@@ -58,11 +84,11 @@ exports.init = function (app, opts) {
         }
         // Remove leading and closing slashes
         options.params = options.params.replace(/^\//, '').replace(/\/$/, '');
-        options.params = options.params != '' ? '/' + options.params : '';
+        options.params = options.params !== '' ? '/' + options.params : '';
         if (settings.i18n) {
             options.language = (options.language ? options.language : settings.defaultLanguage) + '/';
         } else {
-            options.language = ''
+            options.language = '';
         }
         options.suffix = typeof options.suffix == 'undefined' ? true : options.suffix;
         options.suffix = options.suffix ? settings.suffix : '';
@@ -83,7 +109,7 @@ exports.init = function (app, opts) {
             options.suffix
         );
         return defaultURL == url ? format('%s/%s', options.base, options.language) : url;
-    }
+    };
 
     // Load controllers
     var list = [],
@@ -96,6 +122,9 @@ exports.init = function (app, opts) {
     list.forEach(function (ctrl) {
         var name = path.basename(ctrl, path.extname(ctrl));
         controllers[name] = exports[name] = require(path.join(rootPath, ctrl));
+        controllers[name].ctrl4x = exports;
+        controllers[name].getURL = getURL;
+        controllers[name].delegate = delegate;
         for (var i in settings.inject) {
             if (!settings.inject.hasOwnProperty(i)) {
                 continue;
@@ -119,9 +148,11 @@ exports.init = function (app, opts) {
         params = params === '' ? [] : params.split('/');
         // language
         if (settings.i18n) {
-            language = request.param('language', settings.defaultLanguage);
             if (params[0] && settings.languages.indexOf(params[0]) != -1) {
                 language = params.shift();
+                response.cookie('i18n', language);
+            } else if (request.cookies.i18n && settings.languages.indexOf(request.cookies.i18n) != -1) {
+                language = request.cookies.i18n;
             } else {
                 language = settings.defaultLanguage;
             }
@@ -186,28 +217,4 @@ exports.init = function (app, opts) {
     });
 };
 
-exports.delegate = function (ctrl, action) {
-    return function (request, response, next) {
-        ctrl.request = request;
-        ctrl.response = response;
-        ctrl.next = next;
-        if (settings.i18n) {
-            var params = request.url.replace(/^\//, '').replace(/\/$/, ''),
-                language = params === settings.defaultLanguage ? [] : params.split('/')[0];
-
-            if (settings.languages.indexOf(language) == -1) {
-                language = settings.defaultLanguage;
-            }
-
-            ctrl.language = language;
-        }
-        try {
-            ctrl[action].apply(ctrl);
-        } catch (e) {
-            if (settings.debug) {
-                console.log(e.stack.toString());
-                response.end(e.stack.toString());
-            }
-        }
-    };
-};
+exports.delegate = delegate;
