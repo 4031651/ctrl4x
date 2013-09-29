@@ -8,21 +8,8 @@ function endsWith(str, pattern) {
 
 function delegate(ctrl, action) {
     return function (request, response, next) {
-        ctrl.request = request;
-        ctrl.response = response;
-        ctrl.next = next;
-        if (settings.i18n) {
-            var params = request.url.replace(/^\//, '').replace(/\/$/, ''),
-                language = params === settings.defaultLanguage ? [] : params.split('/')[0];
-
-            if (settings.languages.indexOf(language) == -1) {
-                language = settings.defaultLanguage;
-            }
-
-            ctrl.language = language;
-        }
         try {
-            ctrl[action].apply(ctrl);
+            ctrl[action].apply(ctrl, [request, response, next]);
         } catch (e) {
             if (settings.debug) {
                 console.log(e.stack.toString());
@@ -77,8 +64,15 @@ exports.init = function (app, opts) {
         options.base = options.base.replace(/\/$/, '');
 
         options.controller = options.controller || settings.defaultController;
-        options.action = options.action || settings.defaultAction;
         options.params = options.params || '';
+        if (options.params) {
+            options.action = options.action || settings.defaultAction;
+        } else {
+            options.params = '';
+            options.action = options.action || '';
+        }
+        options.controller += options.action ? '/' : '';
+        
         if (Array.isArray(options.params)) {
             options.params = options.params.join('/');
         }
@@ -93,20 +87,13 @@ exports.init = function (app, opts) {
         options.suffix = typeof options.suffix == 'undefined' ? true : options.suffix;
         options.suffix = options.suffix ? settings.suffix : '';
 
-        var defaultURL = format('%s/%s%s/%s%s',
-            options.base,
-            settings.i18n ? options.language : '',
-            settings.defaultController,
-            settings.defaultAction,
-            options.suffix
+        var defaultURL = format('%s/%s%s%s%s',
+            options.base, options.language, settings.defaultController,
+            '', options.suffix
         );
-        var url = format('%s/%s%s/%s%s%s',
-            options.base,
-            options.language,
-            options.controller,
-            options.action,
-            options.params,
-            options.suffix
+        var url = format('%s/%s%s%s%s%s',
+            options.base, options.language, options.controller,
+            options.action, options.params, options.suffix
         );
         return defaultURL == url ? format('%s/%s', options.base, options.language) : url;
     };
@@ -134,9 +121,7 @@ exports.init = function (app, opts) {
     });
 
     app.all('*', function (request, response, next) {
-        var language,
-            controller = request.param('controller', settings.defaultController),
-            action = request.param('action', settings.defaultAction),
+        var language, controller, action,
             params = request.url
                 // Remove leading and closing slashes
                 .replace(/^\//, '')
@@ -156,12 +141,20 @@ exports.init = function (app, opts) {
             } else {
                 language = settings.defaultLanguage;
             }
+            // detect i18n module
+            if (typeof response.setLocale == 'function') {
+                response.setLocale(request, language);
+                request.languages = settings.languages;
+                response.locale = request.locale;
+                response.locals.locale = request.locale;
+            }
+            response.language = language;
+            response.locals.language = language;
+            request.language = language;
         }
 
         // controller
-        if (params[0]) {
-            controller = params.shift();
-        }
+        controller = params[0] ? params.shift() : settings.defaultController;
         if (typeof controllers[controller] == 'undefined') {
             // controller doesn't exist
             next();
@@ -169,9 +162,7 @@ exports.init = function (app, opts) {
         }
     
         // action
-        if (params[0]) {
-            action = params.shift();
-        }
+        action = params[0] ? params.shift() : settings.defaultAction;
         if (settings.useMethod) {
             var _action = action;
             switch (settings.useMethod) {
@@ -197,15 +188,10 @@ exports.init = function (app, opts) {
             return;
         }
 
-        controllers[controller].request = request;
-        controllers[controller].response = response;
-        controllers[controller].next = next;
-        response.locals.controller = controller;
-        response.locals.action = action;
-        if (settings.i18n) {
-            response.locals.language = language;
-            controllers[controller].language = language;
-        }
+        request.controller = response.locals.controller = controller;
+        request.action = response.locals.action = action;
+
+        params.unshift(request, response, next);
         try {
             controllers[controller][action].apply(controllers[controller], params);
         } catch (e) {
